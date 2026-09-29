@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Petualangan Tangga Nada Interaktif - Kelas 2 SD</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts: Fredoka & Comic Neue -->
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* MENCEGAH CONTEXT MENU & HL/SELECT TEKS DI SELURUH HALAMAN */
+        * {
+            font-family: 'Fredoka', 'Comic Neue', cursive, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            -webkit-touch-callout: none !important;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(135deg, #e0f2fe 0%, #fbcfe8 50%, #fef3c7 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Container Tangga Nada Bertingkat */
+        .stair-container {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            height: 420px;
+            padding-bottom: 20px;
+        }
+
+        /* Balok Tangga Nada Sesuai Gambar Referensi */
+        .stair-step {
+            transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease;
+            box-shadow: 0 10px 0 rgba(0, 0, 0, 0.18), 0 15px 25px rgba(0,0,0,0.12);
+            border-top: 5px solid rgba(255, 255, 255, 0.8);
+            border-left: 5px solid rgba(255, 255, 255, 0.6);
+            border-right: 5px solid rgba(0, 0, 0, 0.1);
+            border-bottom: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .stair-step:hover {
+            transform: translateY(-5px);
+            filter: brightness(1.06);
+        }
+
+        .stair-step:active, .stair-step.active {
+            transform: translateY(8px);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), 0 5px 10px rgba(0,0,0,0.1);
+            filter: brightness(1.15);
+        }
+
+        .stair-step.highlight {
+            animation: pulse-glow 0.8s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(1); box-shadow: 0 0 20px #fff, 0 10px 0 rgba(0,0,0,0.2); }
+            100% { transform: scale(1.06); box-shadow: 0 0 35px #fde047, 0 10px 0 rgba(0,0,0,0.2); }
+        }
+
+        /* Maskot Bouncing */
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        .mascot-bounce {
+            animation: bounce-slow 2.5s infinite ease-in-out;
+        }
+
+        /* Glassmorphic Panel UI */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            border: 3px solid rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;" class="flex flex-col min-h-screen justify-between p-2 sm:p-4 text-slate-800 select-none">
+
+    <header id="main-header" class="hidden w-full max-w-5xl mx-auto flex justify-between items-center bg-white/90 rounded-2xl p-3 sm:p-4 shadow-lg border-2 border-white mb-2">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-white text-2xl shadow-inner border-2 border-white">
+                <i class="fa-solid fa-music"></i>
+            </div>
+            <div>
+                <h1 class="text-lg sm:text-xl font-bold text-indigo-700 leading-tight">Tangga Nada Ceria</h1>
+                <p id="user-greeting" class="text-xs sm:text-sm text-pink-600 font-semibold">Halo, Teman Kecil!</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-4">
+            <!-- Score & Star Display -->
+            <div class="bg-yellow-100 border-2 border-yellow-300 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                <i class="fa-solid fa-star text-yellow-500 text-lg sm:text-xl"></i>
+                <span id="score-text" class="font-bold text-yellow-800 text-base sm:text-lg">0</span>
+            </div>
+            <!-- Sound Toggle -->
+            <button id="btn-sound" onclick="toggleSound()" class="w-10 h-10 bg-indigo-100 hover:bg-indigo-200 rounded-xl flex items-center justify-center text-indigo-600 font-bold transition">
+                <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+            </button>
+            <!-- Back to Menu -->
+            <button onclick="showScreen('screen-menu')" class="bg-red-400 hover:bg-red-500 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition flex items-center gap-1">
+                <i class="fa-solid fa-house"></i> <span class="hidden sm:inline">Menu</span>
+            </button>
+        </div>
+    </header>
+
+    <section id="screen-login" class="flex-1 flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden">
+            <div class="absolute -top-10 -right-10 w-28 h-28 bg-yellow-300 rounded-full opacity-40 blur-lg"></div>
+            <div class="absolute -bottom-10 -left-10 w-28 h-28 bg-pink-400 rounded-full opacity-40 blur-lg"></div>
+
+            <div class="mascot-bounce inline-block mb-3">
+                <div class="w-24 h-24 sm:w-28 sm:h-28 bg-gradient-to-tr from-pink-400 to-purple-400 rounded-full p-2 mx-auto shadow-xl border-4 border-white flex items-center justify-center">
+                    <span class="text-6xl sm:text-7xl">🐱</span>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-indigo-900 mb-1">Seni Musik Kelas 2 SD</h2>
+            <p class="text-sm sm:text-base text-purple-600 mb-6 font-semibold">Petualangan Tangga Nada Interaktif</p>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div class="text-left">
+                    <label for="input-name" class="block text-xs sm:text-sm font-bold text-gray-700 mb-1 ml-1">Siapa Nama Kamu?</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-purple-400"></i>
+                        <input type="text" id="input-name" required maxlength="15" placeholder="Tulis namamu di sini..." 
+                            class="w-full pl-11 pr-4 py-3.5 bg-white/90 border-2 border-purple-200 rounded-2xl focus:outline-none focus:border-purple-500 text-gray-800 font-bold placeholder-gray-400 shadow-inner text-base">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-white font-extrabold py-4 rounded-2xl shadow-lg border-b-4 border-teal-700 active:border-b-0 active:translate-y-1 transition text-lg flex items-center justify-center gap-2">
+                    <span>Mulai Belajar!</span>
+                    <i class="fa-solid fa-circle-play"></i>
+                </button>
+            </form>
+            <p class="text-xs text-gray-500 mt-4">Dapat dimainkan di HP, Tablet, Laptop & Smartboard</p>
+        </div>
+    </section>
+
+    <section id="screen-menu" class="hidden flex-1 flex flex-col items-center justify-center p-2 sm:p-4">
+        <div class="glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 text-center">
+
+            <!-- Mascot Banner -->
+            <div class="flex items-center justify-center gap-4 mb-6 bg-gradient-to-r from-indigo-100 to-pink-100 p-4 rounded-2xl border-2 border-indigo-200">
+                <span class="text-5xl mascot-bounce">🐱</span>
+                <div class="text-left">
+                    <h3 id="welcome-title" class="text-xl sm:text-2xl font-bold text-indigo-900">Halo!</h3>
+                    <p class="text-xs sm:text-sm text-indigo-700">Pilih mode belajar atau tantangan di bawah ini ya!</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Mode Eksplorasi -->
+                <button onclick="startMode('explore')" class="group relative bg-gradient-to-br from-cyan-400 to-blue-500 hover:from-cyan-500 hover:to-blue-600 text-white p-5 rounded-2xl shadow-xl border-b-4 border-blue-700 active:translate-y-1 active:border-b-0 transition text-left flex flex-col justify-between h-36">
+                    <div class="flex justify-between items-start">
+                        <span class="bg-white/30 p-2 rounded-xl text-2xl"><i class="fa-solid fa-hand-pointer"></i></span>
+                        <span class="bg-blue-800/40 text-xs px-2.5 py-1 rounded-full font-bold">Bebas</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-bold">1. Mode Eksplorasi</h4>
+                        <p class="text-xs opacity-90">Bebas memencet dan mendengarkan nada</p>
+                    </div>
+                </button>
+
+                <!-- Game Level 1 -->
+                <button onclick="startMode('level1')" class="group relative bg-gradient-to-br from-emerald-400 to-green-500 hover:from-emerald-500 hover:to-green-600 text-white p-5 rounded-2xl shadow-xl border-b-4 border-green-700 active:translate-y-1 active:border-b-0 transition text-left flex flex-col justify-between h-36">
+                    <div class="flex justify-between items-start">
+                        <span class="bg-white/30 p-2 rounded-xl text-2xl"><i class="fa-solid fa-ear-listen"></i></span>
+                        <span class="bg-green-800/40 text-xs px-2.5 py-1 rounded-full font-bold">Mudah</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-bold">2. Tebak 1 Nada</h4>
+                        <p class="text-xs opacity-90">Dengarkan dan tebak tangga nadanya</p>
+                    </div>
+                </button>
+
+                <!-- Game Level 2 -->
+                <button onclick="startMode('level2')" class="group relative bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white p-5 rounded-2xl shadow-xl border-b-4 border-orange-700 active:translate-y-1 active:border-b-0 transition text-left flex flex-col justify-between h-36">
+                    <div class="flex justify-between items-start">
+                        <span class="bg-white/30 p-2 rounded-xl text-2xl"><i class="fa-solid fa-brain"></i></span>
+                        <span class="bg-orange-800/40 text-xs px-2.5 py-1 rounded-full font-bold">Sedang</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-bold">3. Memory Melodi</h4>
+                        <p class="text-xs opacity-90">Ingat dan tiru 2-3 urutan nada</p>
+                    </div>
+                </button>
+
+                <!-- Game Level 3 -->
+                <button onclick="startMode('level3')" class="group relative bg-gradient-to-br from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white p-5 rounded-2xl shadow-xl border-b-4 border-pink-700 active:translate-y-1 active:border-b-0 transition text-left flex flex-col justify-between h-36">
+                    <div class="flex justify-between items-start">
+                        <span class="bg-white/30 p-2 rounded-xl text-2xl"><i class="fa-solid fa-music"></i></span>
+                        <span class="bg-purple-800/40 text-xs px-2.5 py-1 rounded-full font-bold">Sulit</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-bold">4. Lengkapi Lagu Anak</h4>
+                        <p class="text-xs opacity-90">Isi nada lagu yang hilang!</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <main id="screen-game" class="hidden flex-1 flex flex-col items-center justify-between max-w-5xl mx-auto w-full my-auto py-2">
+        
+        <!-- Instruction / Header Banner -->
+        <div class="w-full bg-white/90 rounded-2xl p-3 sm:p-4 shadow-lg border-2 border-white mb-2 text-center relative flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl sm:text-4xl mascot-bounce">🐱</span>
+                <div class="text-left">
+                    <h2 id="game-mode-title" class="text-xs sm:text-sm font-bold text-pink-600 uppercase tracking-wide">Mode Eksplorasi</h2>
+                    <p id="game-instruction" class="text-sm sm:text-base font-bold text-indigo-900 leading-tight">Tekan tangga nada untuk mendengarkan bunyinya!</p>
+                </div>
+            </div>
+
+            <!-- Play Sound Again Button -->
+            <button id="btn-replay" onclick="replayChallengeSound()" class="hidden bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition flex items-center gap-1.5 shrink-0">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Putar Lagi</span>
+            </button>
+        </div>
+
+        <!-- STAIRCASE CONTAINER (Bertingkat Naik Sesuai Gambar Referensi) -->
+        <div class="w-full overflow-x-auto py-4 flex justify-center items-end min-h-[400px]">
+            <div id="staircase-wrapper" class="stair-container items-end gap-1.5 sm:gap-3 px-4 min-w-[650px]">
+                <!-- Dynamic Stairs Loaded via JS -->
+            </div>
+        </div>
+
+        <!-- Extra Helper Controls -->
+        <div class="w-full flex justify-between items-center bg-white/70 backdrop-blur-md rounded-2xl p-3 border border-white">
+            <div class="text-xs sm:text-sm font-bold text-gray-700 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info text-blue-500 text-lg"></i>
+                <span>Tips: Tahan balok tangga untuk memperpanjang bunyi nada, lalu lepaskan!</span>
+            </div>
+            <button onclick="showScreen('screen-menu')" class="text-xs sm:text-sm text-indigo-700 font-bold hover:underline">
+                Ganti Mode
+            </button>
+        </div>
+    </main>
+
+    <div id="modal-result" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center animate-bounce-in">
+            <!-- Stars Display -->
+            <div id="modal-stars" class="flex justify-center gap-2 mb-2 text-3xl text-yellow-400">
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+            </div>
+            <div id="modal-icon" class="text-5xl mb-2">🎉</div>
+            <h3 id="modal-title" class="text-2xl font-extrabold text-indigo-900 mb-1">Hebat Sekali!</h3>
+            <p id="modal-message" class="text-sm font-semibold text-gray-700 mb-6">Kamu berhasil menyelesaikan tantangan ini!</p>
+            
+            <div class="flex gap-3">
+                <button onclick="closeModal(); startCurrentMode();" class="flex-1 bg-amber-400 hover:bg-amber-500 text-amber-900 font-bold py-3 rounded-2xl shadow-md border-b-4 border-amber-600 active:translate-y-1 active:border-b-0 transition">
+                    Coba Lagi
+                </button>
+                <button onclick="closeModal(); showScreen('screen-menu');" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-md border-b-4 border-indigo-700 active:translate-y-1 active:border-b-0 transition">
+                    Menu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mencegah klik kanan di mana pun (Global Context Menu Prevention)
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        }, false);
+
+        // Data Tangga Nada (Presisi Sesuai Gambar Referensi)
+        const NOTES = [
+            { id: 0, num: "1", name: "Do", freq: 261.63, bg: "bg-gradient-to-t from-red-600 via-red-500 to-red-400", heightClass: "h-[180px]" },
+            { id: 1, num: "2", name: "Re", freq: 293.66, bg: "bg-gradient-to-t from-orange-600 via-orange-500 to-orange-400", heightClass: "h-[210px]" },
+            { id: 2, num: "3", name: "Mi", freq: 329.63, bg: "bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400", heightClass: "h-[240px]" },
+            { id: 3, num: "4", name: "Fa", freq: 349.23, bg: "bg-gradient-to-t from-emerald-600 via-emerald-500 to-emerald-400", heightClass: "h-[270px]" },
+            { id: 4, num: "5", name: "Sol", freq: 392.00, bg: "bg-gradient-to-t from-cyan-600 via-cyan-500 to-cyan-400", heightClass: "h-[300px]" },
+            { id: 5, num: "6", name: "La", freq: 440.00, bg: "bg-gradient-to-t from-blue-600 via-blue-500 to-blue-400", heightClass: "h-[330px]" },
+            { id: 6, num: "7", name: "Si", freq: 493.88, bg: "bg-gradient-to-t from-purple-600 via-purple-500 to-purple-400", heightClass: "h-[360px]" },
+            { id: 7, num: "1̇", name: "Do'", freq: 523.25, bg: "bg-gradient-to-t from-pink-600 via-pink-500 to-pink-400", heightClass: "h-[390px]" }
+        ];
+
+        // Data Lagu Level 3
+        const SONGS = [
+            {
+                title: "Balonku Ada Lima",
+                melody: [2, 2, 2, 4, 3, 2, 1],
+                missingIndex: 3, 
+                hint: "Lengkapi melodi: Mi - Mi - Mi - [...] - Mi - Re - Do"
+            },
+            {
+                title: "Bintang Kecil",
+                melody: [0, 4, 4, 3, 2, 2, 1],
+                missingIndex: 1, 
+                hint: "Lengkapi melodi: Do - [...] - Sol - Fa - Mi - Mi - Re"
+            },
+            {
+                title: "Kasih Ibu",
+                melody: [2, 1, 2, 3, 0, 2, 1],
+                missingIndex: 3, 
+                hint: "Lengkapi melodi: Mi - Re - Mi - [...] - Do - Re - Do"
+            }
+        ];
+
+        // Global Variables
+        let userName = "";
+        let currentScore = 0;
+        let currentMode = "explore";
+        let isSoundMuted = false;
+        let audioCtx = null;
+        let activeOscillators = {};
+
+        let targetNoteIndex = null;
+        let memorySequence = [];
+        let playerSequence = [];
+        let currentSong = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function startNoteAudio(index) {
+            if (isSoundMuted) return;
+            initAudio();
+
+            stopNoteAudio(index, true);
+
+            const note = NOTES[index];
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(note.freq, audioCtx.currentTime);
+
+            const now = audioCtx.currentTime;
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.6, now + 0.03);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(now);
+
+            // Safety timer max 4 detik agar nada tidak macet
+            const autoCapTimer = setTimeout(() => {
+                stopNoteAudio(index);
+            }, 4000);
+
+            activeOscillators[index] = { 
+                osc, 
+                gain, 
+                startTime: now, 
+                autoCapTimer 
+            };
+        }
+
+        function stopNoteAudio(index, immediate = false) {
+            if (activeOscillators[index]) {
+                const { osc, gain, autoCapTimer } = activeOscillators[index];
+                if (autoCapTimer) clearTimeout(autoCapTimer);
+
+                const now = audioCtx.currentTime;
+                
+                if (immediate) {
+                    gain.gain.cancelScheduledValues(now);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    try {
+                        osc.stop(now);
+                        osc.disconnect();
+                    } catch (e) {}
+                } else {
+                    gain.gain.cancelScheduledValues(now);
+                    gain.gain.setTargetAtTime(0.0001, now, 0.05);
+
+                    setTimeout(() => {
+                        try {
+                            osc.stop();
+                            osc.disconnect();
+                        } catch (e) {}
+                    }, 120);
+                }
+
+                delete activeOscillators[index];
+            }
+        }
+
+        function stopAllNotes() {
+            Object.keys(activeOscillators).forEach(index => {
+                stopNoteAudio(index, true);
+            });
+        }
+
+        function playEffect(type) {
+            if (isSoundMuted) return;
+            initAudio();
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.setValueAtTime(150, now + 0.15);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+        }
+
+        function toggleSound() {
+            isSoundMuted = !isSoundMuted;
+            if (isSoundMuted) stopAllNotes();
+            const icon = document.getElementById('sound-icon');
+            icon.className = isSoundMuted ? "fa-solid fa-volume-xmark text-red-500" : "fa-solid fa-volume-high text-indigo-600";
+        }
+
+        function showScreen(screenId) {
+            stopAllNotes();
+            document.getElementById('screen-login').classList.add('hidden');
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('screen-game').classList.add('hidden');
+
+            document.getElementById(screenId).classList.remove('hidden');
+
+            const header = document.getElementById('main-header');
+            if (screenId === 'screen-login') {
+                header.classList.add('hidden');
+            } else {
+                header.classList.remove('hidden');
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('input-name').value.trim();
+            if (nameInput) {
+                userName = nameInput;
+                document.getElementById('user-greeting').innerText = `Halo, ${userName}! 👋`;
+                document.getElementById('welcome-title').innerText = `Selamat Datang, ${userName}!`;
+                showScreen('screen-menu');
+            }
+        }
+
+        function renderStaircase() {
+            const wrapper = document.getElementById('staircase-wrapper');
+            wrapper.innerHTML = '';
+
+            NOTES.forEach((note, index) => {
+                const step = document.createElement('div');
+                step.className = `stair-step ${note.heightClass} ${note.bg} w-16 sm:w-20 rounded-t-3xl flex flex-col justify-between items-center py-4 text-white font-extrabold select-none shadow-xl`;
+                step.dataset.index = index;
+
+                // Mematikan konteks menu di setiap tombol
+                step.oncontextmenu = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                };
+
+                step.innerHTML = `
+                    <div class="w-11 h-11 sm:w-12 sm:h-12 bg-white/25 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/60 text-white text-xl sm:text-2xl shadow-inner font-extrabold mt-1 pointer-events-none">
+                        ${note.num}
+                    </div>
+                    <div class="text-base sm:text-lg tracking-wider font-extrabold drop-shadow-md mb-1 pointer-events-none">
+                        ${note.name}
+                    </div>
+                `;
+
+                // Handle Pointer Events (Touch, Mouse, Pen)
+                const handlePressStart = (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    if (step.dataset.pressed === "true") return;
+                    step.dataset.pressed = "true";
+                    step.classList.add('active');
+                    startNoteAudio(index);
+                    triggerParticle(step);
+                    handleNoteInteraction(index);
+                };
+
+                const handlePressEnd = (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    if (step.dataset.pressed !== "true") return;
+                    step.dataset.pressed = "false";
+                    step.classList.remove('active');
+                    stopNoteAudio(index);
+                };
+
+                step.addEventListener('pointerdown', handlePressStart);
+                step.addEventListener('pointerup', handlePressEnd);
+                step.addEventListener('pointerleave', handlePressEnd);
+                step.addEventListener('pointercancel', handlePressEnd);
+
+                wrapper.appendChild(step);
+            });
+        }
+
+        function triggerParticle(element) {
+            const rect = element.getBoundingClientRect();
+            const x = (rect.left + rect.width / 2) / window.innerWidth;
+            const y = rect.top / window.innerHeight;
+
+            confetti({
+                particleCount: 10,
+                spread: 35,
+                startVelocity: 18,
+                origin: { x: x, y: y },
+                colors: ['#ffffff', '#fde047', '#f43f5e']
+            });
+        }
+
+        function startMode(mode) {
+            currentMode = mode;
+            showScreen('screen-game');
+            renderStaircase();
+            startCurrentMode();
+        }
+
+        function startCurrentMode() {
+            stopAllNotes();
+            const titleEl = document.getElementById('game-mode-title');
+            const instructEl = document.getElementById('game-instruction');
+            const replayBtn = document.getElementById('btn-replay');
+
+            replayBtn.classList.add('hidden');
+
+            if (currentMode === 'explore') {
+                titleEl.innerText = "Mode 1: Eksplorasi Bebas";
+                instructEl.innerText = "Pencet tangga nada mana saja untuk mendengar suaranya!";
+            } 
+            else if (currentMode === 'level1') {
+                titleEl.innerText = "Level 1: Tebak 1 Nada";
+                instructEl.innerText = "Dengarkan baik-baik, lalu tebak tangga nada yang berbunyi!";
+                replayBtn.classList.remove('hidden');
+                setupLevel1();
+            } 
+            else if (currentMode === 'level2') {
+                titleEl.innerText = "Level 2: Memory Melodi";
+                instructEl.innerText = "Perhatikan urutan nada yang berbunyi, lalu tiru!";
+                replayBtn.classList.remove('hidden');
+                setupLevel2();
+            } 
+            else if (currentMode === 'level3') {
+                titleEl.innerText = "Level 3: Lengkapi Melodi Lagu";
+                replayBtn.classList.remove('hidden');
+                setupLevel3();
+            }
+        }
+
+        function setupLevel1() {
+            targetNoteIndex = Math.floor(Math.random() * NOTES.length);
+            setTimeout(() => {
+                playTargetNote(targetNoteIndex);
+            }, 500);
+        }
+
+        function playTargetNote(index) {
+            startNoteAudio(index);
+            setTimeout(() => stopNoteAudio(index), 650);
+        }
+
+        function setupLevel2() {
+            memorySequence = [];
+            playerSequence = [];
+            for (let i = 0; i < 3; i++) {
+                memorySequence.push(Math.floor(Math.random() * NOTES.length));
+            }
+            setTimeout(() => {
+                playSequence(memorySequence);
+            }, 500);
+        }
+
+        function playSequence(seq) {
+            let i = 0;
+            const interval = setInterval(() => {
+                const noteIndex = seq[i];
+                highlightStep(noteIndex);
+                startNoteAudio(noteIndex);
+                setTimeout(() => stopNoteAudio(noteIndex), 450);
+
+                i++;
+                if (i >= seq.length) {
+                    clearInterval(interval);
+                }
+            }, 800);
+        }
+
+        function setupLevel3() {
+            currentSong = SONGS[Math.floor(Math.random() * SONGS.length)];
+            document.getElementById('game-instruction').innerText = `Lagu: "${currentSong.title}". ${currentSong.hint}`;
+            setTimeout(() => {
+                playSongWithMissing(currentSong);
+            }, 500);
+        }
+
+        function playSongWithMissing(song) {
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i !== song.missingIndex) {
+                    const noteIndex = song.melody[i];
+                    highlightStep(noteIndex);
+                    startNoteAudio(noteIndex);
+                    setTimeout(() => stopNoteAudio(noteIndex), 400);
+                }
+
+                i++;
+                if (i >= song.melody.length) {
+                    clearInterval(interval);
+                }
+            }, 700);
+        }
+
+        function replayChallengeSound() {
+            stopAllNotes();
+            if (currentMode === 'level1' && targetNoteIndex !== null) {
+                playTargetNote(targetNoteIndex);
+            } else if (currentMode === 'level2' && memorySequence.length > 0) {
+                playerSequence = [];
+                playSequence(memorySequence);
+            } else if (currentMode === 'level3' && currentSong) {
+                playSongWithMissing(currentSong);
+            }
+        }
+
+        function highlightStep(index) {
+            const steps = document.querySelectorAll('.stair-step');
+            if (steps[index]) {
+                steps[index].classList.add('highlight');
+                setTimeout(() => steps[index].classList.remove('highlight'), 500);
+            }
+        }
+
+        function handleNoteInteraction(index) {
+            if (currentMode === 'explore') return;
+
+            if (currentMode === 'level1') {
+                if (index === targetNoteIndex) {
+                    addScore(10);
+                    playEffect('correct');
+                    showModal("🎉 Jawaban Benar!", `Hebat sekali ${userName}! Kamu menebak nada ${NOTES[index].name} dengan tepat!`, 3);
+                } else {
+                    playEffect('wrong');
+                    document.getElementById('game-instruction').innerText = "Ups, kurang tepat! Coba dengarkan lagi ya!";
+                }
+            } 
+            else if (currentMode === 'level2') {
+                playerSequence.push(index);
+                const currentIndex = playerSequence.length - 1;
+
+                if (playerSequence[currentIndex] !== memorySequence[currentIndex]) {
+                    playEffect('wrong');
+                    document.getElementById('game-instruction').innerText = "Urutannya belum pas! Yuk, coba dengarkan lagi!";
+                    playerSequence = [];
+                    return;
+                }
+
+                if (playerSequence.length === memorySequence.length) {
+                    addScore(20);
+                    playEffect('correct');
+                    showModal("⭐ Luar Biasa!", `Hebat sekali ${userName}! Ingatan memorimu luar biasa!`, 3);
+                }
+            } 
+            else if (currentMode === 'level3') {
+                const correctMissingNote = currentSong.melody[currentSong.missingIndex];
+                if (index === correctMissingNote) {
+                    addScore(30);
+                    playEffect('correct');
+                    showModal("🎵 Maestro Cilik!", `Luar biasa ${userName}! Kamu berhasil melengkapi lagu ${currentSong.title} dengan nada ${NOTES[index].name}!`, 3);
+                } else {
+                    playEffect('wrong');
+                    document.getElementById('game-instruction').innerText = `Belum tepat! Cari nada yang pas untuk lagu "${currentSong.title}"!`;
+                }
+            }
+        }
+
+        function addScore(points) {
+            currentScore += points;
+            document.getElementById('score-text').innerText = currentScore;
+        }
+
+        function showModal(title, message, stars = 3) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            
+            const starsContainer = document.getElementById('modal-stars');
+            starsContainer.innerHTML = '';
+            for (let i = 0; i < stars; i++) {
+                starsContainer.innerHTML += '<i class="fa-solid fa-star text-yellow-400"></i>';
+            }
+
+            document.getElementById('modal-result').classList.remove('hidden');
+
+            confetti({
+                particleCount: 80,
+                spread: 80,
+                origin: { y: 0.6 }
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('modal-result').classList.add('hidden');
+        }
+
+        window.addEventListener('blur', stopAllNotes);
+        window.addEventListener('pointercancel', stopAllNotes);
+
+        window.onload = function() {
+            renderStaircase();
+        };
+    </script>
+</body>
+</html>
